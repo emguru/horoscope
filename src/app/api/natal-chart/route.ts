@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const chart = await fetchNatalChart(birthData);
+    const apiKey = request.headers.get("x-free-astro-api-key") || undefined;
+    const chart = await fetchNatalChart(birthData, apiKey);
     if (!chart) {
       return NextResponse.json(
         { error: "Failed to calculate natal chart" },

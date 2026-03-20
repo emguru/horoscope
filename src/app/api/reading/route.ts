@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import type { NatalChartData } from "@/lib/types";
+import type { NatalChartData, PronounOption } from "@/lib/types";
 
 const readingSchema = z.object({
   summary: z.string().describe("2-3 sentence overview of today's astrological energy for this chart"),
@@ -29,17 +29,22 @@ You are an expert astrologer providing daily readings. Follow these STRICT guide
 `;
 
 export async function POST(request: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
+  const headerKey = request.headers.get("x-openai-api-key");
+  const apiKey = headerKey || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured. Add it to .env.local" },
+      { error: "OpenAI API key required. Add in Settings or .env.local" },
       { status: 503 }
     );
   }
 
+  const openai = createOpenAI({ apiKey });
+
   try {
-    const { natalChart, todayDate } = (await request.json()) as {
+    const { natalChart, todayDate, pronoun } = (await request.json()) as {
       natalChart: NatalChartData;
       todayDate: string;
+      pronoun?: PronounOption;
     };
 
     if (!natalChart?.planets?.length) {
@@ -49,18 +54,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const pronounGuide =
+      pronoun && pronoun !== "prefer-not-to-say"
+        ? `Use "${pronoun}" pronouns when referring to the native (e.g. ${pronoun === "he" ? "he/him/his" : pronoun === "she" ? "she/her/hers" : "they/them/theirs"}).`
+        : "Use neutral language or 'the native' when referring to the person.";
+
     const chartContext = `
 NATAL CHART DATA (use this exact data - do not invent positions):
 ${JSON.stringify(natalChart, null, 2)}
 
 TODAY'S DATE: ${todayDate}
+
+PRONOUN GUIDELINE: ${pronounGuide}
 `;
 
     const { object } = await generateObject({
       model: openai("gpt-4o-mini"),
       schema: readingSchema,
       system: `${ANALYTICAL_GUIDELINES}\n\n${chartContext}`,
-      prompt: `Generate a precise daily astrological reading for today (${todayDate}) based exclusively on the natal chart data above. Every claim must trace back to a specific placement, house, or aspect in the chart.`,
+      prompt: `Generate a precise daily astrological reading for today (${todayDate}) based exclusively on the natal chart data above. Every claim must trace back to a specific placement, house, or aspect in the chart. ${pronounGuide}`,
     });
 
     return NextResponse.json(object);

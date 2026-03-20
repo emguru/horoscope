@@ -2,6 +2,11 @@
 
 import { useState, useCallback } from "react";
 
+export interface ApiConfig {
+  baseUrl: string;
+  headers: Record<string, string>;
+}
+
 export interface BirthDataFormProps {
   onSubmit: (data: {
     date: string;
@@ -11,9 +16,11 @@ export interface BirthDataFormProps {
     lng?: number;
   }) => void;
   isLoading?: boolean;
+  apiConfig?: ApiConfig;
+  submitLabel?: string;
 }
 
-export function BirthDataForm({ onSubmit, isLoading }: BirthDataFormProps) {
+export function BirthDataForm({ onSubmit, isLoading, apiConfig, submitLabel }: BirthDataFormProps) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("12:00");
   const [location, setLocation] = useState("");
@@ -30,7 +37,11 @@ export function BirthDataForm({ onSubmit, isLoading }: BirthDataFormProps) {
     setLocationError("");
 
     try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(location.trim())}`);
+      const base = apiConfig?.baseUrl ?? "";
+      const headers = apiConfig?.headers ?? {};
+      const res = await fetch(`${base}/api/geocode?q=${encodeURIComponent(location.trim())}`, {
+        headers,
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -45,7 +56,7 @@ export function BirthDataForm({ onSubmit, isLoading }: BirthDataFormProps) {
     } finally {
       setIsGeocoding(false);
     }
-  }, [location]);
+  }, [location, apiConfig]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,7 +155,7 @@ export function BirthDataForm({ onSubmit, isLoading }: BirthDataFormProps) {
         disabled={isLoading || isGeocoding}
         className="mt-2 px-6 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-950"
       >
-        {isLoading ? "Calculating..." : isGeocoding ? "Finding location..." : "Get your daily horoscope"}
+        {isLoading ? "Calculating..." : isGeocoding ? "Finding location..." : (submitLabel ?? "Get your daily horoscope")}
       </button>
     </form>
   );

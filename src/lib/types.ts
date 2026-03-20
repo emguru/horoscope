@@ -1,3 +1,5 @@
+export type PronounOption = "he" | "she" | "they" | "prefer-not-to-say";
+
 export interface BirthData {
   date: string; // YYYY-MM-DD
   time: string; // HH:mm (24h)
@@ -38,4 +40,13 @@ export interface DailyReading {
   houseFocus: string;
   advice: string;
   keyAspects: string[];
+}
+
+export interface SynastryReading {
+  summary: string;
+  strengths: string[];
+  challenges: string[];
+  communication: string;
+  emotionalConnection: string;
+  advice: string;
 }

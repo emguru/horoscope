@@ -4,12 +4,13 @@ const FREE_ASTRO_API_URL = "https://api.freeastroapi.com/api/v1/natal/calculate"
 
 /**
  * Fetch natal chart from FreeAstroAPI
- * Requires FREE_ASTRO_API_KEY in env (free tier: 80 req/day)
+ * Uses apiKey param, or FREE_ASTRO_API_KEY from env (free tier: 80 req/day)
  */
 export async function fetchNatalChart(
-  birthData: BirthData
+  birthData: BirthData,
+  apiKeyOverride?: string
 ): Promise<NatalChartData | null> {
-  const apiKey = process.env.FREE_ASTRO_API_KEY;
+  const apiKey = apiKeyOverride || process.env.FREE_ASTRO_API_KEY;
   if (!apiKey) {
     console.warn("FREE_ASTRO_API_KEY not set - using fallback");
     return generateFallbackNatalChart(birthData);

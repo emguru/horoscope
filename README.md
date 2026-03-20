@@ -29,6 +29,19 @@ A Next.js app that generates personalized daily astrological readings based on y
    npm run dev
    ```
 
+## Settings (Web & Android)
+
+Both apps include a **Settings** button (⚙):
+
+- **Pronouns** – He/She/They or prefer not to say. Personalizes reading language.
+- **API Base URL** – Leave empty on web. On Android, set your backend URL.
+- **Use custom API keys** – Toggle to enter FreeAstro and OpenAI keys.
+
+## Features
+
+- **Daily Reading** – Personal horoscope based on your natal chart
+- **Compare with Partner** – Synastry / relationship compatibility between two birth charts
+
 ## How it works
 
 1. User enters birth date, time, and location.
@@ -38,6 +51,18 @@ A Next.js app that generates personalized daily astrological readings based on y
    - Every statement references specific placements
    - No generic horoscope language
    - Professional, data-driven tone
+
+## Android app
+
+An Android version lives in the `android/` subfolder. It uses the same backend APIs.
+
+```bash
+cd android
+npm install
+npm run android    # Run on emulator/device
+```
+
+To build an APK, see [android/README.md](android/README.md). Use **EAS Build** for cloud builds (no Android Studio required).
 
 ## Tech stack
 
