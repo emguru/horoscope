@@ -1,25 +1,34 @@
 "use client";
 
 import { use, useState } from "react";
-import { BirthDataForm } from "@/components/BirthDataForm";
-import { PartnerCompareForm } from "@/components/PartnerCompareForm";
 import { ReadingDisplay } from "@/components/ReadingDisplay";
 import { SynastryReadingDisplay } from "@/components/SynastryReadingDisplay";
 import { Settings } from "@/components/Settings";
 import { AppConfigProvider, useAppConfig } from "@/lib/AppConfig";
-import type { DailyReading, SynastryReading } from "@/lib/types";
+import type { DailyReading, SynastryReading, StoredBirthData } from "@/lib/types";
 import type { NatalChartData } from "@/lib/types";
 
 type PageProps = {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-type Mode = "daily" | "compare";
+type Mode = "me" | "us";
+
+function birthDataToApiFormat(d: StoredBirthData) {
+  return {
+    date: d.date,
+    time: d.time,
+    location: d.location.trim(),
+    lat: d.lat,
+    lng: d.lng,
+    name: d.name.trim() || undefined,
+  };
+}
 
 function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   use(searchParams ?? Promise.resolve({}));
   const { config, setConfig } = useAppConfig();
-  const [mode, setMode] = useState<Mode>("daily");
+  const [mode, setMode] = useState<Mode | null>(null);
   const [reading, setReading] = useState<DailyReading | null>(null);
   const [synastryReading, setSynastryReading] = useState<SynastryReading | null>(null);
   const [natalChart, setNatalChart] = useState<NatalChartData | null>(null);
@@ -36,7 +45,6 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
         ...(config.openaiKey && { "x-openai-api-key": config.openaiKey }),
       }
     : {};
-  const apiConfig = { baseUrl, headers: apiHeaders };
 
   const clearResults = () => {
     setReading(null);
@@ -46,26 +54,29 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
     setChartB(null);
   };
 
-  const handleDailySubmit = async (data: {
-    date: string;
-    time: string;
-    location: string;
-    lat?: number;
-    lng?: number;
-  }) => {
+  const handleMe = async () => {
+    setMode("me");
     setError(null);
     clearResults();
+    if (!config.myBirthData) {
+      setError("Add your birth data in Settings first.");
+      return;
+    }
+    const data = birthDataToApiFormat(config.myBirthData);
+    if (!data.date || !data.time || data.location.length < 2) {
+      setError("Complete your birth data in Settings (name, date, time, location).");
+      return;
+    }
     setIsLoading(true);
-
     try {
       const chartRes = await fetch(`${baseUrl}/api/natal-chart`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
         body: JSON.stringify(data),
       });
-
       const chartData = await chartRes.json();
       if (!chartRes.ok) throw new Error(chartData.error || "Failed to calculate natal chart");
+      if (chartData.subject) chartData.subject.name = config.myBirthData.name.trim() || chartData.subject.name;
       setNatalChart(chartData);
 
       const today = new Date().toISOString().split("T")[0];
@@ -78,7 +89,6 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
           pronoun: config.pronoun,
         }),
       });
-
       const readingData = await readingRes.json();
       if (!readingRes.ok) throw new Error(readingData.error || "Failed to generate reading");
       setReading(readingData);
@@ -90,14 +100,24 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
     }
   };
 
-  const handleCompareSubmit = async (
-    dataA: { date: string; time: string; location: string; lat?: number; lng?: number },
-    dataB: { date: string; time: string; location: string; lat?: number; lng?: number }
-  ) => {
+  const handleUs = async () => {
+    setMode("us");
     setError(null);
     clearResults();
+    if (!config.myBirthData || !config.partnerBirthData) {
+      setError("Add both your and your partner's birth data in Settings first.");
+      return;
+    }
+    const dataA = birthDataToApiFormat(config.myBirthData);
+    const dataB = birthDataToApiFormat(config.partnerBirthData);
+    if (
+      !dataA.date || !dataA.time || dataA.location.length < 2 ||
+      !dataB.date || !dataB.time || dataB.location.length < 2
+    ) {
+      setError("Complete both birth records in Settings (name, date, time, location for each).");
+      return;
+    }
     setIsLoading(true);
-
     try {
       const [chartARes, chartBRes] = await Promise.all([
         fetch(`${baseUrl}/api/natal-chart`, {
@@ -111,13 +131,12 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
           body: JSON.stringify(dataB),
         }),
       ]);
-
       const chartAData = await chartARes.json();
       const chartBData = await chartBRes.json();
-
-      if (!chartARes.ok) throw new Error(chartAData.error || "Failed to calculate chart 1");
-      if (!chartBRes.ok) throw new Error(chartBData.error || "Failed to calculate chart 2");
-
+      if (!chartARes.ok) throw new Error(chartAData.error || "Failed to calculate your chart");
+      if (!chartBRes.ok) throw new Error(chartBData.error || "Failed to calculate partner chart");
+      if (chartAData.subject) chartAData.subject.name = config.myBirthData.name.trim() || chartAData.subject.name;
+      if (chartBData.subject) chartBData.subject.name = config.partnerBirthData.name.trim() || chartBData.subject.name;
       setChartA(chartAData);
       setChartB(chartBData);
 
@@ -133,7 +152,6 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
           pronounB: config.pronoun,
         }),
       });
-
       const synastryData = await synastryRes.json();
       if (!synastryRes.ok) throw new Error(synastryData.error || "Failed to generate synastry reading");
       setSynastryReading(synastryData);
@@ -154,7 +172,7 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
           <header className="flex items-start justify-between gap-4 mb-12">
             <div className="text-center flex-1">
               <h1 className="text-4xl sm:text-5xl font-bold text-amber-50 tracking-tight">
-                Daily Horoscope Natal Based
+                Daily Horoscope
               </h1>
               <p className="mt-3 text-amber-200/70 text-lg">
                 Your personalized daily reading or relationship compatibility
@@ -170,67 +188,65 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
             </button>
           </header>
 
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-4 mb-8">
             <button
               type="button"
-              onClick={() => { setMode("daily"); clearResults(); }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                mode === "daily"
+              onClick={handleMe}
+              disabled={isLoading}
+              className={`flex-1 py-5 px-6 rounded-xl font-semibold text-lg transition-colors ${
+                mode === "me"
                   ? "bg-amber-500 text-slate-900"
-                  : "bg-slate-800/60 text-amber-200 hover:bg-slate-800"
-              }`}
+                  : "bg-slate-800/60 text-amber-200 hover:bg-slate-800 border border-amber-500/20"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              Daily Reading
+              {isLoading && mode === "me" ? "Loading..." : "Me"}
             </button>
             <button
               type="button"
-              onClick={() => { setMode("compare"); clearResults(); }}
-              className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                mode === "compare"
+              onClick={handleUs}
+              disabled={isLoading}
+              className={`flex-1 py-5 px-6 rounded-xl font-semibold text-lg transition-colors ${
+                mode === "us"
                   ? "bg-amber-500 text-slate-900"
-                  : "bg-slate-800/60 text-amber-200 hover:bg-slate-800"
-              }`}
+                  : "bg-slate-800/60 text-amber-200 hover:bg-slate-800 border border-amber-500/20"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              Compare with Partner
+              {isLoading && mode === "us" ? "Loading..." : "Us"}
             </button>
           </div>
 
-          <section className="rounded-2xl bg-slate-900/70 border border-amber-500/20 p-6 sm:p-8 shadow-xl shadow-amber-500/5">
-            {mode === "daily" ? (
-              <BirthDataForm
-                onSubmit={handleDailySubmit}
-                isLoading={isLoading}
-                apiConfig={apiConfig}
-              />
-            ) : (
-              <PartnerCompareForm
-                onSubmit={handleCompareSubmit}
-                isLoading={isLoading}
-                apiConfig={apiConfig}
-              />
-            )}
-          </section>
+          <p className="text-center text-amber-200/60 text-sm mb-8">
+            Set your birth data (and your partner&apos;s for Us) in Settings. It&apos;s stored locally.
+          </p>
 
           {error && (
-            <div className="mt-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300" role="alert">
+            <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300" role="alert">
               {error}
             </div>
           )}
 
           {reading && (
-            <section className="mt-12">
+            <section className="mt-8">
               <h2 className="text-2xl font-semibold text-amber-50 mb-6">Your reading for today</h2>
               <ReadingDisplay reading={reading} natalChart={natalChart} />
             </section>
           )}
 
           {synastryReading && (
-            <section className="mt-12">
-              <h2 className="text-2xl font-semibold text-amber-50 mb-6">Relationship compatibility</h2>
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold text-amber-50 mb-6">
+                {config.myBirthData?.name && config.partnerBirthData?.name
+                  ? `${config.myBirthData.name} & ${config.partnerBirthData.name}`
+                  : "Relationship compatibility"}
+              </h2>
               <SynastryReadingDisplay
                 reading={synastryReading}
                 chartA={chartA}
                 chartB={chartB}
+                nameA={config.myBirthData?.name}
+                nameB={config.partnerBirthData?.name}
+                roleA="You"
+                roleB="Partner"
               />
             </section>
           )}

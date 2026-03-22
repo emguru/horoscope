@@ -6,19 +6,43 @@ interface SynastryReadingDisplayProps {
   reading: SynastryReading;
   chartA?: NatalChartData | null;
   chartB?: NatalChartData | null;
+  nameA?: string;
+  nameB?: string;
+  roleA?: string;
+  roleB?: string;
 }
 
 export function SynastryReadingDisplay({
   reading,
   chartA,
   chartB,
+  nameA = "Person 1",
+  nameB = "Person 2",
+  roleA,
+  roleB,
 }: SynastryReadingDisplayProps) {
+  const labelA = roleA ? `${nameA} (${roleA})` : nameA;
+  const labelB = roleB ? `${nameB} (${roleB})` : nameB;
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     >
+      {reading.dailyComparison ? (
+        <View style={[styles.section, styles.highlightSection]}>
+          <Text style={styles.sectionTitle}>Today&apos;s Energy Comparison</Text>
+          <Text style={styles.text}>{reading.dailyComparison}</Text>
+        </View>
+      ) : null}
+
+      {reading.dailyRelationshipAdvice ? (
+        <View style={[styles.section, styles.dailyAdviceSection]}>
+          <Text style={styles.sectionTitle}>Relationship Advice for Today</Text>
+          <Text style={styles.text}>{reading.dailyRelationshipAdvice}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Relationship Overview</Text>
         <Text style={styles.text}>{reading.summary}</Text>
@@ -65,7 +89,7 @@ export function SynastryReadingDisplay({
           <View style={styles.chartRow}>
             {chartA?.planets?.length ? (
               <View style={styles.chartBox}>
-                <Text style={styles.chartLabel}>Person 1</Text>
+                <Text style={styles.chartLabel}>{labelA}</Text>
                 {chartA.planets.map((p) => (
                   <Text key={p.name} style={styles.planetChip}>
                     {p.name} {p.sign}
@@ -75,7 +99,7 @@ export function SynastryReadingDisplay({
             ) : null}
             {chartB?.planets?.length ? (
               <View style={styles.chartBox}>
-                <Text style={styles.chartLabel}>Person 2</Text>
+                <Text style={styles.chartLabel}>{labelB}</Text>
                 {chartB.planets.map((p) => (
                   <Text key={p.name} style={styles.planetChip}>
                     {p.name} {p.sign}
@@ -100,6 +124,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
+  },
+  highlightSection: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    borderColor: "rgba(245, 158, 11, 0.3)",
+  },
+  dailyAdviceSection: {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderColor: "rgba(245, 158, 11, 0.35)",
   },
   adviceSection: {
     backgroundColor: "rgba(245, 158, 11, 0.1)",

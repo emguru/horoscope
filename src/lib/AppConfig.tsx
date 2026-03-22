@@ -7,11 +7,10 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import type { PronounOption, StoredBirthData } from "./types";
+export type { PronounOption };
 
 const STORAGE_KEY = "horoscope-app-config";
-
-import type { PronounOption } from "./types";
-export type { PronounOption };
 
 export interface AppConfig {
   apiUrl: string;
@@ -19,7 +18,16 @@ export interface AppConfig {
   freeAstroKey: string;
   openaiKey: string;
   pronoun: PronounOption;
+  myBirthData: StoredBirthData | null;
+  partnerBirthData: StoredBirthData | null;
 }
+
+const emptyBirthData: StoredBirthData = {
+  name: "",
+  date: "",
+  time: "12:00",
+  location: "",
+};
 
 const defaultConfig: AppConfig = {
   apiUrl: "",
@@ -27,6 +35,8 @@ const defaultConfig: AppConfig = {
   freeAstroKey: "",
   openaiKey: "",
   pronoun: "prefer-not-to-say",
+  myBirthData: null,
+  partnerBirthData: null,
 };
 
 function loadFromStorage(): AppConfig {
@@ -35,7 +45,12 @@ function loadFromStorage(): AppConfig {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<AppConfig>;
-      return { ...defaultConfig, ...parsed };
+      return {
+        ...defaultConfig,
+        ...parsed,
+        myBirthData: parsed.myBirthData ?? null,
+        partnerBirthData: parsed.partnerBirthData ?? null,
+      };
     }
   } catch {
     // ignore

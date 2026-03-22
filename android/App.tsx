@@ -6,19 +6,17 @@ import {
   Text,
   View,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
 } from "react-native";
-import { BirthDataForm } from "./src/BirthDataForm";
-import { PartnerCompareForm } from "./src/PartnerCompareForm";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { ReadingDisplay } from "./src/ReadingDisplay";
 import { SynastryReadingDisplay } from "./src/SynastryReadingDisplay";
 import { SettingsScreen } from "./src/SettingsScreen";
 import { AppConfigProvider, useAppConfig } from "./src/AppConfig";
 import { fetchNatalChart, fetchReading, fetchSynastryReading } from "./src/api";
-import type { DailyReading, SynastryReading, NatalChartData } from "./src/types";
+import type { DailyReading, SynastryReading, NatalChartData, StoredBirthData } from "./src/types";
 
-type Mode = "daily" | "compare";
+type Mode = "me" | "us";
 
 async function getNetworkErrorHint(): Promise<string> {
   try {
@@ -32,9 +30,20 @@ async function getNetworkErrorHint(): Promise<string> {
   return "Network error. Check Settings: add OpenAI API key (required for readings).";
 }
 
+function birthDataToApiFormat(d: StoredBirthData) {
+  return {
+    date: d.date,
+    time: d.time,
+    location: d.location.trim(),
+    lat: d.lat,
+    lng: d.lng,
+    name: d.name.trim() || undefined,
+  };
+}
+
 function MainContent() {
   const { config } = useAppConfig();
-  const [mode, setMode] = useState<Mode>("daily");
+  const [mode, setMode] = useState<Mode | null>(null);
   const [reading, setReading] = useState<DailyReading | null>(null);
   const [synastryReading, setSynastryReading] = useState<SynastryReading | null>(null);
   const [natalChart, setNatalChart] = useState<NatalChartData | null>(null);
@@ -57,23 +66,27 @@ function MainContent() {
     setChartB(null);
   };
 
-  const handleDailySubmit = async (data: {
-    date: string;
-    time: string;
-    location: string;
-    lat?: number;
-    lng?: number;
-  }) => {
+  const handleMe = async () => {
+    setMode("me");
     setError(null);
     clearResults();
     if (!config.openaiKey?.trim()) {
       setError("OpenAI API key required. Go to Settings and add your key from platform.openai.com");
       return;
     }
+    if (!config.myBirthData) {
+      setError("Add your birth data in Settings first.");
+      return;
+    }
+    const data = birthDataToApiFormat(config.myBirthData);
+    if (!data.date || !data.time || data.location.length < 2) {
+      setError("Complete your birth data in Settings (name, date, time, location).");
+      return;
+    }
     setIsLoading(true);
-
     try {
       const chartData = await fetchNatalChart(data, apiConfig);
+      if (chartData.subject) chartData.subject.name = config.myBirthData.name.trim() || chartData.subject.name;
       setNatalChart(chartData);
 
       const today = new Date().toISOString().split("T")[0];
@@ -96,24 +109,35 @@ function MainContent() {
     }
   };
 
-  const handleCompareSubmit = async (
-    dataA: { date: string; time: string; location: string; lat?: number; lng?: number },
-    dataB: { date: string; time: string; location: string; lat?: number; lng?: number }
-  ) => {
+  const handleUs = async () => {
+    setMode("us");
     setError(null);
     clearResults();
     if (!config.openaiKey?.trim()) {
       setError("OpenAI API key required. Go to Settings and add your key from platform.openai.com");
       return;
     }
+    if (!config.myBirthData || !config.partnerBirthData) {
+      setError("Add both your and your partner's birth data in Settings first.");
+      return;
+    }
+    const dataA = birthDataToApiFormat(config.myBirthData);
+    const dataB = birthDataToApiFormat(config.partnerBirthData);
+    if (
+      !dataA.date || !dataA.time || dataA.location.length < 2 ||
+      !dataB.date || !dataB.time || dataB.location.length < 2
+    ) {
+      setError("Complete both birth records in Settings (name, date, time, location for each).");
+      return;
+    }
     setIsLoading(true);
-
     try {
       const [chartAData, chartBData] = await Promise.all([
         fetchNatalChart(dataA, apiConfig),
         fetchNatalChart(dataB, apiConfig),
       ]);
-
+      if (chartAData.subject) chartAData.subject.name = config.myBirthData.name.trim() || chartAData.subject.name;
+      if (chartBData.subject) chartBData.subject.name = config.partnerBirthData.name.trim() || chartBData.subject.name;
       setChartA(chartAData);
       setChartB(chartBData);
 
@@ -159,7 +183,7 @@ function MainContent() {
       >
         <View style={styles.headerRow}>
           <View style={styles.header}>
-            <Text style={styles.title}>Daily Horoscope Natal Based</Text>
+            <Text style={styles.title}>Daily Horoscope</Text>
             <Text style={styles.subtitle}>
               Your personalized daily reading or relationship compatibility
             </Text>
@@ -172,46 +196,30 @@ function MainContent() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.modeRow}>
+        <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.modeButton, mode === "daily" && styles.modeButtonActive]}
-            onPress={() => {
-              setMode("daily");
-              clearResults();
-            }}
+            style={[styles.mainButton, mode === "me" && styles.mainButtonActive, isLoading && styles.mainButtonDisabled]}
+            onPress={handleMe}
+            disabled={isLoading}
           >
-            <Text style={[styles.modeButtonText, mode === "daily" && styles.modeButtonTextActive]}>
-              Daily Reading
+            <Text style={[styles.mainButtonText, mode === "me" && styles.mainButtonTextActive]}>
+              {isLoading && mode === "me" ? "Loading..." : "Me"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.modeButton, mode === "compare" && styles.modeButtonActive]}
-            onPress={() => {
-              setMode("compare");
-              clearResults();
-            }}
+            style={[styles.mainButton, mode === "us" && styles.mainButtonActive, isLoading && styles.mainButtonDisabled]}
+            onPress={handleUs}
+            disabled={isLoading}
           >
-            <Text style={[styles.modeButtonText, mode === "compare" && styles.modeButtonTextActive]}>
-              Compare Partner
+            <Text style={[styles.mainButtonText, mode === "us" && styles.mainButtonTextActive]}>
+              {isLoading && mode === "us" ? "Loading..." : "Us"}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.formSection}>
-          {mode === "daily" ? (
-            <BirthDataForm
-              onSubmit={handleDailySubmit}
-              isLoading={isLoading}
-              apiConfig={apiConfig}
-            />
-          ) : (
-            <PartnerCompareForm
-              onSubmit={handleCompareSubmit}
-              isLoading={isLoading}
-              apiConfig={apiConfig}
-            />
-          )}
-        </View>
+        <Text style={styles.hint}>
+          Set your birth data (and your partner&apos;s for Us) in Settings. It&apos;s stored locally.
+        </Text>
 
         {error ? (
           <View style={styles.errorBox}>
@@ -228,11 +236,19 @@ function MainContent() {
 
         {synastryReading ? (
           <View style={styles.readingSection}>
-            <Text style={styles.readingTitle}>Relationship compatibility</Text>
+            <Text style={styles.readingTitle}>
+              {config.myBirthData?.name && config.partnerBirthData?.name
+                ? `${config.myBirthData.name} & ${config.partnerBirthData.name}`
+                : "Relationship compatibility"}
+            </Text>
             <SynastryReadingDisplay
               reading={synastryReading}
               chartA={chartA}
               chartB={chartB}
+              nameA={config.myBirthData?.name}
+              nameB={config.partnerBirthData?.name}
+              roleA="You"
+              roleB="Partner"
             />
           </View>
         ) : null}
@@ -243,20 +259,17 @@ function MainContent() {
 
 export default function App() {
   return (
-    <AppConfigProvider>
-      <MainContent />
-    </AppConfigProvider>
+    <SafeAreaProvider>
+      <AppConfigProvider>
+        <MainContent />
+      </AppConfigProvider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
-  scrollView: {
-    flex: 1,
-  },
+  safeArea: { flex: 1, backgroundColor: "#020617" },
+  scrollView: { flex: 1 },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
@@ -270,17 +283,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 24,
   },
-  header: {
-    flex: 1,
-  },
-  settingsButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  settingsButtonText: {
-    color: "#fbbf24",
-    fontSize: 16,
-  },
+  header: { flex: 1 },
+  settingsButton: { padding: 8, marginLeft: 8 },
+  settingsButtonText: { color: "#fbbf24", fontSize: 16 },
   title: {
     fontSize: 28,
     fontWeight: "700",
@@ -294,37 +299,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
-  modeRow: {
+  buttonRow: {
     flexDirection: "row",
+    gap: 16,
     marginBottom: 16,
   },
-  modeButton: {
+  mainButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderRadius: 12,
+    paddingVertical: 20,
+    borderRadius: 16,
     backgroundColor: "rgba(15, 23, 42, 0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.3)",
     alignItems: "center",
   },
-  modeButtonActive: {
-    backgroundColor: "#f59e0b",
-  },
-  modeButtonText: {
-    color: "#fde68a",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  modeButtonTextActive: {
-    color: "#0f172a",
-    fontWeight: "600",
-  },
-  formSection: {
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
-    borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.2)",
-    borderRadius: 16,
-    padding: 20,
+  mainButtonActive: { backgroundColor: "#f59e0b", borderColor: "rgba(245, 158, 11, 0.5)" },
+  mainButtonDisabled: { opacity: 0.6 },
+  mainButtonText: { color: "#fde68a", fontSize: 20, fontWeight: "600" },
+  mainButtonTextActive: { color: "#0f172a" },
+  hint: {
+    fontSize: 13,
+    color: "rgba(253, 230, 138, 0.6)",
+    textAlign: "center",
     marginBottom: 16,
   },
   errorBox: {
@@ -335,13 +331,8 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  errorText: {
-    color: "#fca5a5",
-    fontSize: 14,
-  },
-  readingSection: {
-    marginTop: 24,
-  },
+  errorText: { color: "#fca5a5", fontSize: 14 },
+  readingSection: { marginTop: 24 },
   readingTitle: {
     fontSize: 22,
     fontWeight: "600",

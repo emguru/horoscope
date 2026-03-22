@@ -7,11 +7,53 @@ interface SynastryReadingDisplayProps {
   reading: SynastryReading;
   chartA?: NatalChartData | null;
   chartB?: NatalChartData | null;
+  nameA?: string;
+  nameB?: string;
+  /** Optional: "You" for chartA, "Partner" for chartB - helps verify correct data entry */
+  roleA?: string;
+  roleB?: string;
 }
 
-export function SynastryReadingDisplay({ reading, chartA, chartB }: SynastryReadingDisplayProps) {
+export function SynastryReadingDisplay({
+  reading,
+  chartA,
+  chartB,
+  nameA = "Person 1",
+  nameB = "Person 2",
+  roleA,
+  roleB,
+}: SynastryReadingDisplayProps) {
+  const labelA = roleA ? `${nameA} (${roleA})` : nameA;
+  const labelB = roleB ? `${nameB} (${roleB})` : nameB;
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {reading.dailyComparison && (
+        <section className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-400 mb-3">
+            Today&apos;s Energy Comparison
+          </h2>
+          <p className="text-amber-50/95 leading-relaxed">{reading.dailyComparison}</p>
+        </section>
+      )}
+
+      {reading.goodDaysTogether && (
+        <section className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-400 mb-3">
+            Good Days Together
+          </h2>
+          <p className="text-amber-50/95 leading-relaxed">{reading.goodDaysTogether}</p>
+        </section>
+      )}
+
+      {reading.offDays && (
+        <section className="rounded-xl bg-amber-700/20 border border-amber-600/30 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-400 mb-3">
+            Off Days / Need Space
+          </h2>
+          <p className="text-amber-50/95 leading-relaxed">{reading.offDays}</p>
+        </section>
+      )}
+
       <section className="rounded-xl bg-slate-800/50 border border-amber-500/20 p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-400 mb-3">
           Relationship Overview
@@ -76,7 +118,7 @@ export function SynastryReadingDisplay({ reading, chartA, chartB }: SynastryRead
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {chartA?.planets?.length ? (
               <div>
-                <h3 className="text-xs font-medium text-amber-300 mb-2">Person 1</h3>
+                <h3 className="text-xs font-medium text-amber-300 mb-2">{labelA}</h3>
                 <div className="flex flex-wrap gap-2">
                   {chartA.planets.map((p) => (
                     <span
@@ -91,7 +133,7 @@ export function SynastryReadingDisplay({ reading, chartA, chartB }: SynastryRead
             ) : null}
             {chartB?.planets?.length ? (
               <div>
-                <h3 className="text-xs font-medium text-amber-300 mb-2">Person 2</h3>
+                <h3 className="text-xs font-medium text-amber-300 mb-2">{labelB}</h3>
                 <div className="flex flex-wrap gap-2">
                   {chartB.planets.map((p) => (
                     <span

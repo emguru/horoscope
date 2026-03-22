@@ -6,6 +6,17 @@ export interface BirthData {
   location: string;
   lat?: number;
   lng?: number;
+  name?: string;
+}
+
+/** Stored birth data (persisted in Settings) */
+export interface StoredBirthData {
+  name: string;
+  date: string;
+  time: string;
+  location: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface PlanetPosition {
@@ -49,4 +60,10 @@ export interface SynastryReading {
   communication: string;
   emotionalConnection: string;
   advice: string;
+  /** When you may have good days together (daily compatibility) */
+  goodDaysTogether?: string;
+  /** When you may have off days or need space */
+  offDays?: string;
+  /** Comparison/contrast of your daily energies today */
+  dailyComparison?: string;
 }

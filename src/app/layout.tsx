@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Daily Horoscope Natal Based",
-  description: "Personalized daily astrological readings based on your natal chart",
+  title: "Daily Horoscope",
+  description: "Personalized daily astrological readings",
 };
 
 export default function RootLayout({

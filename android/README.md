@@ -54,6 +54,10 @@ npm run build:apk
 
 The APK will be at: `android/android/app/build/outputs/apk/release/app-release.apk`
 
+**Important:** The release APK has the JavaScript bundle packaged inside. It runs **standalone** on the device—no USB connection or same-network setup needed. The app uses the phone's Wi‑Fi or mobile data for API calls (OpenAI, FreeAstro, etc.).
+
+For a quick release build without regenerating native code: `npm run build:release`
+
 ## Config
 
 Use the **Settings** button (⚙) in the app to configure:

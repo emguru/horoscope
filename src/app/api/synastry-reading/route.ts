@@ -11,6 +11,9 @@ const synastrySchema = z.object({
   communication: z.string().describe("How they communicate and exchange ideas"),
   emotionalConnection: z.string().describe("Emotional and intimate connection"),
   advice: z.string().describe("One actionable piece of relationship advice"),
+  goodDaysTogether: z.string().describe("When this couple may have good days together—aligning energies, supportive transits, harmonious aspects. Be specific about what creates these favorable moments."),
+  offDays: z.string().describe("When they may have off days or need space—contrasting energies, challenging transits, conflicting planetary influences. Be specific about causes."),
+  dailyComparison: z.string().describe("Comparison and contrast of their daily energies for today: how their individual transits interact, where they align vs. differ."),
 });
 
 const SYNANSTRY_GUIDELINES = `
@@ -62,11 +65,27 @@ export async function POST(request: NextRequest) {
         ? `Person A: use ${pronounA} (${pronounA === "he" ? "he/him/his" : pronounA === "she" ? "she/her/hers" : "they/them/theirs"}). Person B: use ${pronounB} (${pronounB === "he" ? "he/him/his" : pronounB === "she" ? "she/her/hers" : "they/them/theirs"}).`
         : "Use 'Person A' and 'Person B' or neutral language when referring to each person.";
 
+    const nameA = (chartA.subject as { name?: string })?.name || "Person A";
+    const nameB = (chartB.subject as { name?: string })?.name || "Person B";
+
+    // Extract key placements so AI never confuses whose chart is whose
+    const getPlacements = (chart: NatalChartData) =>
+      (chart.planets ?? [])
+        .map((p) => `${p.name} ${p.sign}`)
+        .join(", ");
+    const placementsA = getPlacements(chartA);
+    const placementsB = getPlacements(chartB);
+
     const chartContext = `
-PERSON A NATAL CHART:
+CRITICAL - USE EXACT DATA: When you mention "${nameA}" or "Person A", use ONLY the placements from CHART A below. When you mention "${nameB}" or "Person B", use ONLY the placements from CHART B. Never swap them.
+
+${nameA} (Person A / Chart A) placements: ${placementsA}
+${nameB} (Person B / Chart B) placements: ${placementsB}
+
+PERSON A (${nameA}) FULL NATAL CHART:
 ${JSON.stringify(chartA, null, 2)}
 
-PERSON B NATAL CHART:
+PERSON B (${nameB}) FULL NATAL CHART:
 ${JSON.stringify(chartB, null, 2)}
 
 TODAY'S DATE: ${todayDate}
@@ -78,7 +97,7 @@ PRONOUN GUIDE: ${pronounGuide}
       model: openai("gpt-4o-mini"),
       schema: synastrySchema,
       system: `${SYNANSTRY_GUIDELINES}\n\n${chartContext}`,
-      prompt: `Generate a synastry reading comparing these two natal charts. Analyze how their planets interact (aspects, house overlays). Focus on relationship dynamics: communication, emotional connection, strengths, and growth areas. Reference specific planetary pairs from the chart data.`,
+      prompt: `Generate a synastry reading comparing these two natal charts (${nameA} and ${nameB}). Analyze how their planets interact (aspects, house overlays). Include: relationship dynamics, communication, emotional connection, strengths, growth areas. Also add daily compatibility: goodDaysTogether (when they may have good days together today), offDays (when they may have off days or need space), dailyComparison (compare/contrast their individual daily energies and how they interact). Reference specific planetary pairs.`,
     });
 
     return NextResponse.json(object);

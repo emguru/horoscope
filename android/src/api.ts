@@ -24,26 +24,52 @@ export async function geocodeLocation(location: string): Promise<{ lat: number; 
   }
 }
 
+/** Tropical zodiac: (month 1-12, day) when each sign starts */
+const SUN_SIGN_STARTS: { month: number; day: number; sign: string }[] = [
+  { month: 1, day: 20, sign: "Aqu" },
+  { month: 2, day: 19, sign: "Pis" },
+  { month: 3, day: 21, sign: "Ari" },
+  { month: 4, day: 20, sign: "Tau" },
+  { month: 5, day: 21, sign: "Gem" },
+  { month: 6, day: 21, sign: "Can" },
+  { month: 7, day: 23, sign: "Leo" },
+  { month: 8, day: 23, sign: "Vir" },
+  { month: 9, day: 23, sign: "Lib" },
+  { month: 10, day: 23, sign: "Sco" },
+  { month: 11, day: 22, sign: "Sag" },
+  { month: 12, day: 22, sign: "Cap" },
+];
+
+function getSunSignFromDate(month: number, day: number): string {
+  for (let i = SUN_SIGN_STARTS.length - 1; i >= 0; i--) {
+    const { month: m, day: d, sign } = SUN_SIGN_STARTS[i];
+    if (month > m || (month === m && day >= d)) return sign;
+  }
+  return "Cap";
+}
+
 function generateFallbackNatalChart(birthData: BirthData): NatalChartData {
   const [year, month, day] = birthData.date.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  const sunSignIndex = Math.floor(((date.getMonth() * 30 + date.getDate() - 20) % 365) / 30.4);
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  const sunSign = getSunSignFromDate(m, d);
   const signs = ["Cap", "Aqu", "Pis", "Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco", "Sag"];
-  const sunSign = signs[(sunSignIndex + 12) % 12];
+  const sunSignIdx = signs.indexOf(sunSign);
   const planets = [
     { name: "Sun", sign: sunSign, pos: 15, house: 1 },
-    { name: "Moon", sign: signs[(sunSignIndex + 1) % 12], pos: 8, house: 2 },
+    { name: "Moon", sign: signs[(sunSignIdx + 1) % 12], pos: 8, house: 2 },
     { name: "Mercury", sign: sunSign, pos: 12, house: 1 },
-    { name: "Venus", sign: signs[(sunSignIndex + 2) % 12], pos: 22, house: 2 },
-    { name: "Mars", sign: signs[(sunSignIndex + 3) % 12], pos: 5, house: 3 },
-    { name: "Jupiter", sign: signs[(sunSignIndex + 4) % 12], pos: 18, house: 4 },
-    { name: "Saturn", sign: signs[(sunSignIndex + 5) % 12], pos: 3, house: 5 },
-    { name: "Uranus", sign: signs[(sunSignIndex + 6) % 12], pos: 14, house: 6 },
-    { name: "Neptune", sign: signs[(sunSignIndex + 7) % 12], pos: 9, house: 7 },
-    { name: "Pluto", sign: signs[(sunSignIndex + 8) % 12], pos: 21, house: 8 },
+    { name: "Venus", sign: signs[(sunSignIdx + 2) % 12], pos: 22, house: 2 },
+    { name: "Mars", sign: signs[(sunSignIdx + 3) % 12], pos: 5, house: 3 },
+    { name: "Jupiter", sign: signs[(sunSignIdx + 4) % 12], pos: 18, house: 4 },
+    { name: "Saturn", sign: signs[(sunSignIdx + 5) % 12], pos: 3, house: 5 },
+    { name: "Uranus", sign: signs[(sunSignIdx + 6) % 12], pos: 14, house: 6 },
+    { name: "Neptune", sign: signs[(sunSignIdx + 7) % 12], pos: 9, house: 7 },
+    { name: "Pluto", sign: signs[(sunSignIdx + 8) % 12], pos: 21, house: 8 },
   ];
   return {
-    subject: { name: "User", city: birthData.location },
+    subject: { name: birthData.name?.trim() || "User", city: birthData.location },
     planets,
     aspects_summary: { total: 12, major: 12, by_type: { Conjunction: 3, Trine: 2, Square: 2, Opposition: 1 } },
   };
@@ -64,7 +90,7 @@ export async function fetchNatalChart(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: "User",
+          name: birthData.name?.trim() || "User",
           year,
           month,
           day,
@@ -160,19 +186,30 @@ export async function fetchSynastryReading(
     pronounA && pronounA !== "prefer-not-to-say" && pronounB && pronounB !== "prefer-not-to-say"
       ? `Person A: ${pronounA}. Person B: ${pronounB}.`
       : "Use 'Person A' and 'Person B'.";
+  const nameA = chartA.subject?.name || "Person A";
+  const nameB = chartB.subject?.name || "Person B";
+  const getPlacements = (chart: NatalChartData) =>
+    (chart.planets ?? []).map((p) => `${p.name} ${p.sign}`).join(", ");
+  const placementsA = getPlacements(chartA);
+  const placementsB = getPlacements(chartB);
   const system = `${SYNANSTRY_GUIDELINES}
 
-PERSON A NATAL CHART:
+CRITICAL - USE EXACT DATA: When you mention "${nameA}" or "Person A", use ONLY the placements from CHART A. When you mention "${nameB}" or "Person B", use ONLY the placements from CHART B. Never swap them.
+
+${nameA} (Person A / Chart A) placements: ${placementsA}
+${nameB} (Person B / Chart B) placements: ${placementsB}
+
+PERSON A (${nameA}) FULL NATAL CHART:
 ${JSON.stringify(chartA, null, 2)}
 
-PERSON B NATAL CHART:
+PERSON B (${nameB}) FULL NATAL CHART:
 ${JSON.stringify(chartB, null, 2)}
 
 TODAY: ${todayDate}
 PRONOUNS: ${pronounGuide}`;
-  const prompt = `Generate a synastry reading comparing these two natal charts. Analyze planetary interactions (aspects, house overlays). Focus on communication, emotional connection, strengths, and growth areas. Reference specific planetary pairs.
+  const prompt = `Generate a synastry reading comparing these two natal charts (${nameA} and ${nameB}). Analyze planetary interactions (aspects, house overlays). Include: relationship dynamics, communication, emotional connection, strengths, growth areas. Add dailyRelationshipAdvice: one paragraph of relationship advice for today based on current planetary aspects and transits—how to best support each other, what to be aware of, and how to navigate the day together. No specific dates/times—focus on practical guidance. Also add dailyComparison: compare/contrast their individual daily energies and how they interact. Reference specific planetary pairs.
 
-Return JSON with: summary (string), strengths (array of 3 strings), challenges (array of 2 strings), communication (string), emotionalConnection (string), advice (string).`;
+Return JSON with: summary, strengths (array of 3), challenges (array of 2), communication, emotionalConnection, advice, dailyRelationshipAdvice, dailyComparison.`;
   const obj = (await callOpenAI(config.openaiKey, system, prompt)) as SynastryReading;
   return {
     summary: obj.summary ?? "",
@@ -181,5 +218,7 @@ Return JSON with: summary (string), strengths (array of 3 strings), challenges (
     communication: obj.communication ?? "",
     emotionalConnection: obj.emotionalConnection ?? "",
     advice: obj.advice ?? "",
+    dailyRelationshipAdvice: obj.dailyRelationshipAdvice ?? "",
+    dailyComparison: obj.dailyComparison ?? "",
   };
 }
