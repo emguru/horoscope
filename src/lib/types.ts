@@ -25,6 +25,8 @@ export interface PlanetPosition {
   pos: number;
   house?: number;
   retrograde?: boolean;
+  /** Ecliptic longitude 0–360° when available */
+  abs_pos?: number;
 }
 
 export interface NatalChartData {
@@ -43,6 +45,32 @@ export interface NatalChartData {
     type: string;
     orb: number;
   }>;
+}
+
+/** Transit-to-natal aspect row (Swiss Ephemeris API or astronomy-engine fallback) */
+export interface TransitToNatalAspect {
+  transit_body: string;
+  natal_body: string;
+  aspect_type: string;
+  orb_degrees: number;
+  /** Human-readable, when available */
+  description?: string;
+  is_applying?: boolean;
+}
+
+/** Current sky vs natal — changes day to day */
+export interface TransitCalculationData {
+  source: "api" | "fallback";
+  transit_date: string;
+  transit_time?: string;
+  location_note?: string;
+  transit_planets: PlanetPosition[];
+  transit_to_natal_aspects: TransitToNatalAspect[];
+  aspects_summary?: {
+    total: number;
+    major: number;
+    by_type: Record<string, number>;
+  };
 }
 
 export interface DailyReading {

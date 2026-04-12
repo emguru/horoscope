@@ -71,7 +71,8 @@ const SUN_SIGN_STARTS: { month: number; day: number; sign: string }[] = [
   { month: 12, day: 22, sign: "Cap" },
 ];
 
-function getSunSignFromDate(month: number, day: number): string {
+/** Tropical Sun sign abbreviation (Ari, Tau, …) from calendar month/day */
+export function getTropicalSunSignAbbrev(month: number, day: number): string {
   for (let i = SUN_SIGN_STARTS.length - 1; i >= 0; i--) {
     const { month: m, day: d, sign } = SUN_SIGN_STARTS[i];
     if (month > m || (month === m && day >= d)) return sign;
@@ -89,7 +90,7 @@ function generateFallbackNatalChart(birthData: BirthData): NatalChartData {
   const m = date.getMonth() + 1;
   const d = date.getDate();
 
-  const sunSign = getSunSignFromDate(m, d);
+  const sunSign = getTropicalSunSignAbbrev(m, d);
   const signs = [
     "Cap", "Aqu", "Pis", "Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco", "Sag"
   ];

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { BirthDataForm, type ApiConfig } from "./BirthDataForm";
+import { BirthDataForm } from "./BirthDataForm";
+import type { ApiConfig } from "./api";
 
 interface BirthData {
   date: string;

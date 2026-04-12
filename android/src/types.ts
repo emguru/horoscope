@@ -24,6 +24,30 @@ export interface PlanetPosition {
   pos: number;
   house?: number;
   retrograde?: boolean;
+  abs_pos?: number;
+}
+
+export interface TransitToNatalAspect {
+  transit_body: string;
+  natal_body: string;
+  aspect_type: string;
+  orb_degrees: number;
+  description?: string;
+  is_applying?: boolean;
+}
+
+export interface TransitCalculationData {
+  source: "api" | "fallback";
+  transit_date: string;
+  transit_time?: string;
+  location_note?: string;
+  transit_planets: PlanetPosition[];
+  transit_to_natal_aspects: TransitToNatalAspect[];
+  aspects_summary?: {
+    total: number;
+    major: number;
+    by_type: Record<string, number>;
+  };
 }
 
 export interface NatalChartData {

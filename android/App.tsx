@@ -14,6 +14,8 @@ import { SynastryReadingDisplay } from "./src/SynastryReadingDisplay";
 import { SettingsScreen } from "./src/SettingsScreen";
 import { AppConfigProvider, useAppConfig } from "./src/AppConfig";
 import { fetchNatalChart, fetchReading, fetchSynastryReading } from "./src/api";
+import { getTransitCalculation, formatLocalTransitIso } from "./src/transits";
+import { ZodiacWheel } from "./src/ZodiacWheel";
 import type { DailyReading, SynastryReading, NatalChartData, StoredBirthData } from "./src/types";
 
 type Mode = "me" | "us";
@@ -83,18 +85,32 @@ function MainContent() {
       setError("Complete your birth data in Settings (name, date, time, location).");
       return;
     }
+    if (data.lat == null || data.lng == null) {
+      setError("Birth coordinates are missing. Open Settings and re-save your birth place so it can be geocoded.");
+      return;
+    }
     setIsLoading(true);
     try {
       const chartData = await fetchNatalChart(data, apiConfig);
       if (chartData.subject) chartData.subject.name = config.myBirthData.name.trim() || chartData.subject.name;
       setNatalChart(chartData);
 
+      const transitIso = formatLocalTransitIso(new Date());
+      const transitData = await getTransitCalculation(
+        data,
+        chartData,
+        transitIso,
+        config.freeAstroKey?.trim() || undefined
+      );
+
       const today = new Date().toISOString().split("T")[0];
       const readingData = await fetchReading(
         chartData,
+        transitData,
         today,
         apiConfig,
-        config.pronoun !== "prefer-not-to-say" ? config.pronoun : undefined
+        config.pronounYou,
+        config.myBirthData?.name?.trim()
       );
       setReading(readingData);
     } catch (err) {
@@ -130,6 +146,10 @@ function MainContent() {
       setError("Complete both birth records in Settings (name, date, time, location for each).");
       return;
     }
+    if (dataA.lat == null || dataA.lng == null || dataB.lat == null || dataB.lng == null) {
+      setError("Birth coordinates are missing for one or both people. Re-save birth places in Settings.");
+      return;
+    }
     setIsLoading(true);
     try {
       const [chartAData, chartBData] = await Promise.all([
@@ -141,15 +161,23 @@ function MainContent() {
       setChartA(chartAData);
       setChartB(chartBData);
 
+      const transitIso = formatLocalTransitIso(new Date());
+      const faKey = config.freeAstroKey?.trim() || undefined;
+      const [transitA, transitB] = await Promise.all([
+        getTransitCalculation(dataA, chartAData, transitIso, faKey),
+        getTransitCalculation(dataB, chartBData, transitIso, faKey),
+      ]);
+
       const today = new Date().toISOString().split("T")[0];
-      const pronoun = config.pronoun !== "prefer-not-to-say" ? config.pronoun : undefined;
       const synastryData = await fetchSynastryReading(
         chartAData,
         chartBData,
         today,
         apiConfig,
-        pronoun,
-        pronoun
+        config.pronounYou,
+        config.pronounPartner,
+        transitA,
+        transitB
       );
       setSynastryReading(synastryData);
     } catch (err) {
@@ -220,6 +248,11 @@ function MainContent() {
         <Text style={styles.hint}>
           Set your birth data (and your partner&apos;s for Us) in Settings. It&apos;s stored locally.
         </Text>
+
+        <ZodiacWheel
+          myBirthData={config.myBirthData}
+          partnerBirthData={config.partnerBirthData}
+        />
 
         {error ? (
           <View style={styles.errorBox}>

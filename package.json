@@ -13,6 +13,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
     "ai": "^6.0.116",
+    "astronomy-engine": "^2.1.19",
     "next": "16.2.0",
     "openai": "^6.32.0",
     "react": "19.2.4",

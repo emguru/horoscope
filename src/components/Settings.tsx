@@ -11,7 +11,8 @@ interface SettingsProps {
     useCustomKeys: boolean;
     freeAstroKey: string;
     openaiKey: string;
-    pronoun: PronounOption;
+    pronounYou: PronounOption;
+    pronounPartner: PronounOption;
     myBirthData: StoredBirthData | null;
     partnerBirthData: StoredBirthData | null;
   };
@@ -20,7 +21,8 @@ interface SettingsProps {
     useCustomKeys: boolean;
     freeAstroKey: string;
     openaiKey: string;
-    pronoun: PronounOption;
+    pronounYou: PronounOption;
+    pronounPartner: PronounOption;
     myBirthData: StoredBirthData | null;
     partnerBirthData: StoredBirthData | null;
   }>) => void;
@@ -117,7 +119,8 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
   const [useCustomKeys, setUseCustomKeys] = useState(config.useCustomKeys);
   const [freeAstroKey, setFreeAstroKey] = useState(config.freeAstroKey);
   const [openaiKey, setOpenaiKey] = useState(config.openaiKey);
-  const [pronoun, setPronoun] = useState<PronounOption>(config.pronoun);
+  const [pronounYou, setPronounYou] = useState<PronounOption>(config.pronounYou);
+  const [pronounPartner, setPronounPartner] = useState<PronounOption>(config.pronounPartner);
   const [myBirthData, setMyBirthData] = useState<StoredBirthData>(
     config.myBirthData ?? { ...emptyBirth }
   );
@@ -131,7 +134,8 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
     setUseCustomKeys(config.useCustomKeys);
     setFreeAstroKey(config.freeAstroKey);
     setOpenaiKey(config.openaiKey);
-    setPronoun(config.pronoun);
+    setPronounYou(config.pronounYou);
+    setPronounPartner(config.pronounPartner);
     setMyBirthData(config.myBirthData ?? { ...emptyBirth });
     setPartnerBirthData(config.partnerBirthData ?? { ...emptyBirth });
   }, [config, isOpen]);
@@ -174,7 +178,8 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
       useCustomKeys,
       freeAstroKey: useCustomKeys ? freeAstroKey.trim() : "",
       openaiKey: useCustomKeys ? openaiKey.trim() : "",
-      pronoun,
+      pronounYou,
+      pronounPartner,
       myBirthData,
       partnerBirthData,
     });
@@ -207,6 +212,20 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
               baseUrl={baseUrl}
               apiHeaders={apiHeaders}
             />
+            <div className="mt-4">
+              <label htmlFor="pronoun-you" className="block text-xs font-medium text-amber-100/90 mb-1">Your pronouns</label>
+              <select
+                id="pronoun-you"
+                value={pronounYou}
+                onChange={(e) => setPronounYou(e.target.value as PronounOption)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-amber-500/30 text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+              >
+                <option value="prefer-not-to-say">Prefer not to say</option>
+                <option value="he">He/Him</option>
+                <option value="she">She/Her</option>
+                <option value="they">They/Them</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -218,6 +237,20 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
               baseUrl={baseUrl}
               apiHeaders={apiHeaders}
             />
+            <div className="mt-4">
+              <label htmlFor="pronoun-partner" className="block text-xs font-medium text-amber-100/90 mb-1">Partner&apos;s pronouns</label>
+              <select
+                id="pronoun-partner"
+                value={pronounPartner}
+                onChange={(e) => setPronounPartner(e.target.value as PronounOption)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-amber-500/30 text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+              >
+                <option value="prefer-not-to-say">Prefer not to say</option>
+                <option value="he">He/Him</option>
+                <option value="she">She/Her</option>
+                <option value="they">They/Them</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -231,21 +264,6 @@ export function Settings({ isOpen, onClose, config, onSave }: SettingsProps) {
               className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-amber-500/30 text-amber-50 placeholder:text-amber-200/40 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
             />
             <p className="mt-1 text-xs text-amber-200/60">Leave empty to use this site. Set URL if using an external backend.</p>
-          </div>
-
-          <div>
-            <label htmlFor="pronoun" className="block text-sm font-medium text-amber-100/90 mb-1.5">Pronouns (for readings)</label>
-            <select
-              id="pronoun"
-              value={pronoun}
-              onChange={(e) => setPronoun(e.target.value as PronounOption)}
-              className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-amber-500/30 text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
-            >
-              <option value="prefer-not-to-say">Prefer not to say</option>
-              <option value="he">He/Him</option>
-              <option value="she">She/Her</option>
-              <option value="they">They/Them</option>
-            </select>
           </div>
 
           <div className="flex items-center justify-between">

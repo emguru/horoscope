@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
-import type { NatalChartData, PronounOption } from "@/lib/types";
+import { pronounInstructionForPerson } from "@/lib/pronoun-prompt";
+import type { NatalChartData, PronounOption, TransitCalculationData } from "@/lib/types";
 
 const synastrySchema = z.object({
   summary: z.string().describe("2-3 sentence overview of how these two charts interact"),
@@ -19,11 +20,11 @@ const synastrySchema = z.object({
 const SYNANSTRY_GUIDELINES = `
 You are an expert astrologer providing synastry (relationship compatibility) readings. Follow these STRICT guidelines:
 
-1. DATA-DRIVEN: Every statement MUST reference specific placements, aspects, or house overlays from BOTH natal charts. Compare Person A's planets to Person B's planets.
+1. DATA-DRIVEN: Every statement MUST reference specific placements, aspects, or house overlays from BOTH natal charts. Internally map Chart A to the first person's name and Chart B to the second person's name—never swap charts.
 
 2. PRECISION: Name exact aspect types (conjunction, square, trine, opposition, sextile), which planets, and in what signs. Reference house overlays when relevant.
 
-3. SYNTHESIS: Connect how Person A's chart interacts with Person B's chart. Consider: Sun-Moon connections, Venus-Mars (romantic compatibility), Mercury (communication), Saturn (structure/challenges).
+3. SYNTHESIS: Connect how Person A's chart interacts with Person B's chart. Consider: Sun-Moon connections, Venus-Mars (romantic compatibility), Mercury (communication), Saturn (structure/challenges). When TRANSIT DATA is provided, use it for today's relational timing (each person's transits to their own natal chart).
 
 4. AVOID: Generic compatibility language. No "you might feel" without naming the astrological cause. Be specific about WHICH planets create the dynamic.
 
@@ -45,12 +46,14 @@ export async function POST(request: NextRequest) {
   const openai = createOpenAI({ apiKey });
 
   try {
-    const { chartA, chartB, todayDate, pronounA, pronounB } = (await request.json()) as {
+    const { chartA, chartB, todayDate, pronounA, pronounB, transitForA, transitForB } = (await request.json()) as {
       chartA: NatalChartData;
       chartB: NatalChartData;
       todayDate: string;
       pronounA?: PronounOption;
       pronounB?: PronounOption;
+      transitForA?: TransitCalculationData;
+      transitForB?: TransitCalculationData;
     };
 
     if (!chartA?.planets?.length || !chartB?.planets?.length) {
@@ -60,13 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pronounGuide =
-      pronounA && pronounA !== "prefer-not-to-say" && pronounB && pronounB !== "prefer-not-to-say"
-        ? `Person A: use ${pronounA} (${pronounA === "he" ? "he/him/his" : pronounA === "she" ? "she/her/hers" : "they/them/theirs"}). Person B: use ${pronounB} (${pronounB === "he" ? "he/him/his" : pronounB === "she" ? "she/her/hers" : "they/them/theirs"}).`
-        : "Use 'Person A' and 'Person B' or neutral language when referring to each person.";
+    const nameA = (chartA.subject as { name?: string })?.name?.trim() || "Person A";
+    const nameB = (chartB.subject as { name?: string })?.name?.trim() || "Person B";
 
-    const nameA = (chartA.subject as { name?: string })?.name || "Person A";
-    const nameB = (chartB.subject as { name?: string })?.name || "Person B";
+    const pronounGuide = [
+      pronounInstructionForPerson(`${nameA} (Chart A)`, pronounA),
+      pronounInstructionForPerson(`${nameB} (Chart B)`, pronounB),
+    ].join("\n");
+
+    const nameOutputGuide = `USER-FACING NAMES: Write every section using the names "${nameA}" and "${nameB}". Do not use the labels "Person A" or "Person B" in the text shown to the reader. When describing dynamics, attribute behaviors and feelings to "${nameA}" or "${nameB}" by name.`;
 
     // Extract key placements so AI never confuses whose chart is whose
     const getPlacements = (chart: NatalChartData) =>
@@ -76,19 +81,32 @@ export async function POST(request: NextRequest) {
     const placementsA = getPlacements(chartA);
     const placementsB = getPlacements(chartB);
 
+    const transitBlock =
+      transitForA && transitForB
+        ? `
+TRANSITS FOR ${todayDate} — ${nameA}:
+${JSON.stringify(transitForA, null, 2)}
+
+TRANSITS FOR ${todayDate} — ${nameB}:
+${JSON.stringify(transitForB, null, 2)}
+`
+        : "";
+
     const chartContext = `
-CRITICAL - USE EXACT DATA: When you mention "${nameA}" or "Person A", use ONLY the placements from CHART A below. When you mention "${nameB}" or "Person B", use ONLY the placements from CHART B. Never swap them.
+CRITICAL - USE EXACT DATA: "${nameA}" corresponds ONLY to CHART A below. "${nameB}" corresponds ONLY to CHART B. Never swap them.
 
-${nameA} (Person A / Chart A) placements: ${placementsA}
-${nameB} (Person B / Chart B) placements: ${placementsB}
+${nameA} (Chart A) placements: ${placementsA}
+${nameB} (Chart B) placements: ${placementsB}
 
-PERSON A (${nameA}) FULL NATAL CHART:
+CHART A — ${nameA} (natal):
 ${JSON.stringify(chartA, null, 2)}
 
-PERSON B (${nameB}) FULL NATAL CHART:
+CHART B — ${nameB} (natal):
 ${JSON.stringify(chartB, null, 2)}
-
+${transitBlock}
 TODAY'S DATE: ${todayDate}
+
+${nameOutputGuide}
 
 PRONOUN GUIDE: ${pronounGuide}
 `;
@@ -97,7 +115,7 @@ PRONOUN GUIDE: ${pronounGuide}
       model: openai("gpt-4o-mini"),
       schema: synastrySchema,
       system: `${SYNANSTRY_GUIDELINES}\n\n${chartContext}`,
-      prompt: `Generate a synastry reading comparing these two natal charts (${nameA} and ${nameB}). Analyze how their planets interact (aspects, house overlays). Include: relationship dynamics, communication, emotional connection, strengths, growth areas. Also add daily compatibility: goodDaysTogether (when they may have good days together today), offDays (when they may have off days or need space), dailyComparison (compare/contrast their individual daily energies and how they interact). Reference specific planetary pairs.`,
+      prompt: `Generate a synastry reading for ${nameA} and ${nameB}. ${nameOutputGuide} Analyze how their planets interact (aspects, house overlays). Include: relationship dynamics, communication, emotional connection, strengths, growth areas. Also add daily compatibility: goodDaysTogether, offDays, dailyComparison — if TRANSIT DATA is present, ground these sections in each person's transiting planets and transit-to-natal aspects for today; otherwise use synastry between natal charts. Reference specific planetary pairs and the individuals by name.`,
     });
 
     return NextResponse.json(object);

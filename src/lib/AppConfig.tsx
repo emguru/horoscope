@@ -17,7 +17,10 @@ export interface AppConfig {
   useCustomKeys: boolean;
   freeAstroKey: string;
   openaiKey: string;
-  pronoun: PronounOption;
+  /** Pronouns for the primary user ("Me" / chart A in "Us") */
+  pronounYou: PronounOption;
+  /** Pronouns for the partner ("Us" / chart B) */
+  pronounPartner: PronounOption;
   myBirthData: StoredBirthData | null;
   partnerBirthData: StoredBirthData | null;
 }
@@ -34,7 +37,8 @@ const defaultConfig: AppConfig = {
   useCustomKeys: false,
   freeAstroKey: "",
   openaiKey: "",
-  pronoun: "prefer-not-to-say",
+  pronounYou: "prefer-not-to-say",
+  pronounPartner: "prefer-not-to-say",
   myBirthData: null,
   partnerBirthData: null,
 };
@@ -44,12 +48,15 @@ function loadFromStorage(): AppConfig {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored) as Partial<AppConfig>;
+      const parsed = JSON.parse(stored) as Partial<AppConfig> & { pronoun?: PronounOption };
+      const legacy = parsed.pronoun;
       return {
         ...defaultConfig,
         ...parsed,
         myBirthData: parsed.myBirthData ?? null,
         partnerBirthData: parsed.partnerBirthData ?? null,
+        pronounYou: parsed.pronounYou ?? legacy ?? "prefer-not-to-say",
+        pronounPartner: parsed.pronounPartner ?? legacy ?? "prefer-not-to-say",
       };
     }
   } catch {

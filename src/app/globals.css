@@ -37,6 +37,26 @@ body {
   animation: fade-in 0.5s ease-out forwards;
 }
 
+@keyframes zodiac-wheel-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.zodiac-wheel-spin {
+  animation: zodiac-wheel-rotate 56s linear infinite;
+  transform-origin: center center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zodiac-wheel-spin {
+    animation: none;
+  }
+}
+
 .slide-in-from-bottom-4 {
   animation: fade-in 0.5s ease-out forwards;
 }

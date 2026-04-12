@@ -23,7 +23,8 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const { config, setConfig, saveConfig } = useAppConfig();
   const [freeAstroKey, setFreeAstroKey] = useState(config.freeAstroKey);
   const [openaiKey, setOpenaiKey] = useState(config.openaiKey);
-  const [pronoun, setPronoun] = useState<PronounOption>(config.pronoun);
+  const [pronounYou, setPronounYou] = useState<PronounOption>(config.pronounYou);
+  const [pronounPartner, setPronounPartner] = useState<PronounOption>(config.pronounPartner);
   const [myBirthData, setMyBirthData] = useState<StoredBirthData>(
     config.myBirthData ?? { ...emptyBirth }
   );
@@ -35,7 +36,8 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
   useEffect(() => {
     setFreeAstroKey(config.freeAstroKey);
     setOpenaiKey(config.openaiKey);
-    setPronoun(config.pronoun);
+    setPronounYou(config.pronounYou);
+    setPronounPartner(config.pronounPartner);
     setMyBirthData(config.myBirthData ?? { ...emptyBirth });
     setPartnerBirthData(config.partnerBirthData ?? { ...emptyBirth });
   }, [config]);
@@ -60,7 +62,8 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
     setConfig({
       freeAstroKey: freeAstroKey.trim(),
       openaiKey: openaiKey.trim(),
-      pronoun,
+      pronounYou,
+      pronounPartner,
       myBirthData,
       partnerBirthData,
     });
@@ -117,9 +120,45 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
 
       <Text style={styles.sectionHeader}>My info (for &quot;Me&quot;)</Text>
       {renderBirthSection("", myBirthData, setMyBirthData)}
+      <Text style={styles.label}>Your pronouns</Text>
+      <View style={styles.pronounRow}>
+        {(["prefer-not-to-say", "he", "she", "they"] as const).map((p) => (
+          <TouchableOpacity
+            key={`you-${p}`}
+            style={[
+              styles.pronounBtn,
+              pronounYou === p && styles.pronounBtnActive,
+              { marginRight: p !== "they" ? 8 : 0 },
+            ]}
+            onPress={() => setPronounYou(p)}
+          >
+            <Text style={[styles.pronounBtnText, pronounYou === p && styles.pronounBtnTextActive]}>
+              {p === "prefer-not-to-say" ? "—" : p === "he" ? "He" : p === "she" ? "She" : "They"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={styles.sectionHeader}>Partner&apos;s info (for &quot;Us&quot;)</Text>
       {renderBirthSection("", partnerBirthData, setPartnerBirthData)}
+      <Text style={styles.label}>Partner&apos;s pronouns</Text>
+      <View style={styles.pronounRow}>
+        {(["prefer-not-to-say", "he", "she", "they"] as const).map((p) => (
+          <TouchableOpacity
+            key={`partner-${p}`}
+            style={[
+              styles.pronounBtn,
+              pronounPartner === p && styles.pronounBtnActive,
+              { marginRight: p !== "they" ? 8 : 0 },
+            ]}
+            onPress={() => setPronounPartner(p)}
+          >
+            <Text style={[styles.pronounBtnText, pronounPartner === p && styles.pronounBtnTextActive]}>
+              {p === "prefer-not-to-say" ? "—" : p === "he" ? "He" : p === "she" ? "She" : "They"}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <TouchableOpacity
         style={[styles.resolveButton, isResolving && styles.resolveButtonDisabled]}
@@ -157,27 +196,6 @@ export function SettingsScreen({ onClose }: SettingsScreenProps) {
           secureTextEntry
           autoCapitalize="none"
         />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Pronouns (for readings)</Text>
-        <View style={styles.pronounRow}>
-          {(["prefer-not-to-say", "he", "she", "they"] as const).map((p) => (
-            <TouchableOpacity
-              key={p}
-              style={[
-                styles.pronounBtn,
-                pronoun === p && styles.pronounBtnActive,
-                { marginRight: p !== "they" ? 8 : 0 },
-              ]}
-              onPress={() => setPronoun(p)}
-            >
-              <Text style={[styles.pronounBtnText, pronoun === p && styles.pronounBtnTextActive]}>
-                {p === "prefer-not-to-say" ? "—" : p === "he" ? "He" : p === "she" ? "She" : "They"}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>

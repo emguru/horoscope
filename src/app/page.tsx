@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { ReadingDisplay } from "@/components/ReadingDisplay";
 import { SynastryReadingDisplay } from "@/components/SynastryReadingDisplay";
 import { Settings } from "@/components/Settings";
+import { ZodiacWheel } from "@/components/ZodiacWheel";
 import { AppConfigProvider, useAppConfig } from "@/lib/AppConfig";
 import type { DailyReading, SynastryReading, StoredBirthData } from "@/lib/types";
 import type { NatalChartData } from "@/lib/types";
@@ -23,6 +24,16 @@ function birthDataToApiFormat(d: StoredBirthData) {
     lng: d.lng,
     name: d.name.trim() || undefined,
   };
+}
+
+/** Local civil time for transit calculations (YYYY-MM-DDTHH:mm) */
+function formatLocalTransitIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}`;
 }
 
 function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -67,6 +78,10 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
       setError("Complete your birth data in Settings (name, date, time, location).");
       return;
     }
+    if (data.lat == null || data.lng == null) {
+      setError("Birth coordinates are missing. Open Settings and re-save your birth place so it can be geocoded.");
+      return;
+    }
     setIsLoading(true);
     try {
       const chartRes = await fetch(`${baseUrl}/api/natal-chart`, {
@@ -79,14 +94,29 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
       if (chartData.subject) chartData.subject.name = config.myBirthData.name.trim() || chartData.subject.name;
       setNatalChart(chartData);
 
+      const transitIso = formatLocalTransitIso(new Date());
+      const transitsRes = await fetch(`${baseUrl}/api/transits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...apiHeaders },
+        body: JSON.stringify({
+          birthData: data,
+          natalChart: chartData,
+          transitDate: transitIso,
+        }),
+      });
+      const transitData = await transitsRes.json();
+      if (!transitsRes.ok) throw new Error(transitData.error || "Failed to calculate transits");
+
       const today = new Date().toISOString().split("T")[0];
       const readingRes = await fetch(`${baseUrl}/api/reading`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
         body: JSON.stringify({
           natalChart: chartData,
+          transitData,
           todayDate: today,
-          pronoun: config.pronoun,
+          pronoun: config.pronounYou,
+          subjectName: config.myBirthData?.name?.trim() || undefined,
         }),
       });
       const readingData = await readingRes.json();
@@ -117,6 +147,10 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
       setError("Complete both birth records in Settings (name, date, time, location for each).");
       return;
     }
+    if (dataA.lat == null || dataA.lng == null || dataB.lat == null || dataB.lng == null) {
+      setError("Birth coordinates are missing for one or both people. Re-save birth places in Settings so they can be geocoded.");
+      return;
+    }
     setIsLoading(true);
     try {
       const [chartARes, chartBRes] = await Promise.all([
@@ -140,6 +174,32 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
       setChartA(chartAData);
       setChartB(chartBData);
 
+      const transitIso = formatLocalTransitIso(new Date());
+      const [transitsARes, transitsBRes] = await Promise.all([
+        fetch(`${baseUrl}/api/transits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...apiHeaders },
+          body: JSON.stringify({
+            birthData: dataA,
+            natalChart: chartAData,
+            transitDate: transitIso,
+          }),
+        }),
+        fetch(`${baseUrl}/api/transits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...apiHeaders },
+          body: JSON.stringify({
+            birthData: dataB,
+            natalChart: chartBData,
+            transitDate: transitIso,
+          }),
+        }),
+      ]);
+      const transitA = await transitsARes.json();
+      const transitB = await transitsBRes.json();
+      if (!transitsARes.ok) throw new Error(transitA.error || "Failed to calculate transits for you");
+      if (!transitsBRes.ok) throw new Error(transitB.error || "Failed to calculate transits for partner");
+
       const today = new Date().toISOString().split("T")[0];
       const synastryRes = await fetch(`${baseUrl}/api/synastry-reading`, {
         method: "POST",
@@ -148,8 +208,10 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
           chartA: chartAData,
           chartB: chartBData,
           todayDate: today,
-          pronounA: config.pronoun,
-          pronounB: config.pronoun,
+          pronounA: config.pronounYou,
+          pronounB: config.pronounPartner,
+          transitForA: transitA,
+          transitForB: transitB,
         }),
       });
       const synastryData = await synastryRes.json();
@@ -214,6 +276,11 @@ function MainContent({ searchParams }: { searchParams?: Promise<{ [key: string]:
               {isLoading && mode === "us" ? "Loading..." : "Us"}
             </button>
           </div>
+
+          <ZodiacWheel
+            myBirthData={config.myBirthData}
+            partnerBirthData={config.partnerBirthData}
+          />
 
           <p className="text-center text-amber-200/60 text-sm mb-8">
             Set your birth data (and your partner&apos;s for Us) in Settings. It&apos;s stored locally.

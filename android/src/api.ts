@@ -1,4 +1,6 @@
-import type { BirthData, NatalChartData, DailyReading, SynastryReading } from "./types";
+import { dailyReadingNameInstruction, pronounInstructionForPerson } from "./pronoun-prompt";
+import type { BirthData, NatalChartData, DailyReading, PronounOption, SynastryReading, TransitCalculationData } from "./types";
+import { getTransitCalculation, formatLocalTransitIso } from "./transits";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const FREE_ASTRO_URL = "https://api.freeastroapi.com/api/v1/natal/calculate";
@@ -135,28 +137,36 @@ async function callOpenAI(apiKey: string, system: string, prompt: string): Promi
 }
 
 const ANALYTICAL_GUIDELINES = `
-You are an expert astrologer. DATA-DRIVEN: Every statement MUST reference specific data from the natal chart (planetary positions, signs, houses, aspects). Use exact sign names (e.g., "Sun in Virgo at 12.7°"). Connect natal chart placements to today's date. Avoid generic horoscope language. Be concise, 1-3 sentences per section.
+You are an expert astrologer. DATA-DRIVEN: Every statement MUST reference TRANSIT DATA (transiting planets and transit-to-natal aspects) and natal placements as needed. Use exact sign names (e.g., "Sun in Virgo at 12.7°"). The moving sky drives daily themes. Avoid generic horoscope language. Be concise, 1-3 sentences per section.
 `;
 
 export async function fetchReading(
   natalChart: NatalChartData,
+  transitData: TransitCalculationData,
   todayDate: string,
   config: ApiConfig,
-  pronoun?: string
+  pronoun: PronounOption | undefined,
+  subjectName?: string
 ): Promise<DailyReading> {
   if (!config.openaiKey) throw new Error("OpenAI API key required. Add it in Settings.");
-  const pronounGuide =
-    pronoun && pronoun !== "prefer-not-to-say"
-      ? `Use "${pronoun}" pronouns (${pronoun === "he" ? "he/him/his" : pronoun === "she" ? "she/her/hers" : "they/them/theirs"}).`
-      : "Use neutral language or 'the native'.";
+  const displayName = (subjectName?.trim() || natalChart.subject?.name?.trim() || "").trim();
+  const nameGuide = displayName
+    ? dailyReadingNameInstruction(displayName)
+    : "No first name was provided: use second-person 'you' for a direct horoscope voice.";
+  const pronounGuide = pronounInstructionForPerson("This person", pronoun);
   const system = `${ANALYTICAL_GUIDELINES}
 
-NATAL CHART DATA:
+NATAL CHART (birth):
 ${JSON.stringify(natalChart, null, 2)}
 
+TRANSIT DATA (${todayDate}, source ${transitData.source}):
+${JSON.stringify(transitData, null, 2)}
+
 TODAY'S DATE: ${todayDate}
+
+NAME & VOICE: ${nameGuide}
 PRONOUN: ${pronounGuide}`;
-  const prompt = `Generate a precise daily astrological reading for today (${todayDate}) based on the natal chart. Every claim must trace to a specific placement, house, or aspect. ${pronounGuide}
+  const prompt = `Generate a precise daily reading for today (${todayDate}). Lead with transiting planets and transit-to-natal aspects. Every claim must trace to transit data and/or natal placements. ${nameGuide} ${pronounGuide}
 
 Return JSON with: summary (string), planetaryHighlights (array of 3 strings), houseFocus (string), advice (string), keyAspects (array of 2 strings).`;
   const obj = (await callOpenAI(config.openaiKey, system, prompt)) as DailyReading;
@@ -170,7 +180,7 @@ Return JSON with: summary (string), planetaryHighlights (array of 3 strings), ho
 }
 
 const SYNANSTRY_GUIDELINES = `
-You are an expert astrologer providing synastry readings. Reference specific placements, aspects, house overlays from BOTH charts. Name exact aspect types (conjunction, square, trine, opposition, sextile). Connect Person A's chart to Person B's. Be specific about which planets create each dynamic. Be concise, 1-3 sentences per section.
+You are an expert astrologer providing synastry readings. Reference specific placements, aspects, house overlays from BOTH charts. Name exact aspect types (conjunction, square, trine, opposition, sextile). Map Chart A to the first person's name and Chart B to the second—never swap. Be concise, 1-3 sentences per section.
 `;
 
 export async function fetchSynastryReading(
@@ -178,36 +188,51 @@ export async function fetchSynastryReading(
   chartB: NatalChartData,
   todayDate: string,
   config: ApiConfig,
-  pronounA?: string,
-  pronounB?: string
+  pronounA: PronounOption | undefined,
+  pronounB: PronounOption | undefined,
+  transitForA?: TransitCalculationData,
+  transitForB?: TransitCalculationData
 ): Promise<SynastryReading> {
   if (!config.openaiKey) throw new Error("OpenAI API key required. Add it in Settings.");
-  const pronounGuide =
-    pronounA && pronounA !== "prefer-not-to-say" && pronounB && pronounB !== "prefer-not-to-say"
-      ? `Person A: ${pronounA}. Person B: ${pronounB}.`
-      : "Use 'Person A' and 'Person B'.";
-  const nameA = chartA.subject?.name || "Person A";
-  const nameB = chartB.subject?.name || "Person B";
+  const nameA = chartA.subject?.name?.trim() || "Person A";
+  const nameB = chartB.subject?.name?.trim() || "Person B";
+  const pronounGuide = [
+    pronounInstructionForPerson(`${nameA} (Chart A)`, pronounA),
+    pronounInstructionForPerson(`${nameB} (Chart B)`, pronounB),
+  ].join("\n");
+  const nameOutputGuide = `USER-FACING NAMES: Write every section using "${nameA}" and "${nameB}". Do not use "Person A" or "Person B" in the text. Attribute dynamics to each by name.`;
   const getPlacements = (chart: NatalChartData) =>
     (chart.planets ?? []).map((p) => `${p.name} ${p.sign}`).join(", ");
   const placementsA = getPlacements(chartA);
   const placementsB = getPlacements(chartB);
+  const transitBlock =
+    transitForA && transitForB
+      ? `
+TRANSITS ${todayDate} — ${nameA}:
+${JSON.stringify(transitForA, null, 2)}
+
+TRANSITS ${todayDate} — ${nameB}:
+${JSON.stringify(transitForB, null, 2)}
+`
+      : "";
   const system = `${SYNANSTRY_GUIDELINES}
 
-CRITICAL - USE EXACT DATA: When you mention "${nameA}" or "Person A", use ONLY the placements from CHART A. When you mention "${nameB}" or "Person B", use ONLY the placements from CHART B. Never swap them.
+CRITICAL: "${nameA}" = CHART A only. "${nameB}" = CHART B only. Never swap.
 
-${nameA} (Person A / Chart A) placements: ${placementsA}
-${nameB} (Person B / Chart B) placements: ${placementsB}
+${nameA} (Chart A) placements: ${placementsA}
+${nameB} (Chart B) placements: ${placementsB}
 
-PERSON A (${nameA}) FULL NATAL CHART:
+CHART A — ${nameA} (natal):
 ${JSON.stringify(chartA, null, 2)}
 
-PERSON B (${nameB}) FULL NATAL CHART:
+CHART B — ${nameB} (natal):
 ${JSON.stringify(chartB, null, 2)}
-
+${transitBlock}
 TODAY: ${todayDate}
+
+${nameOutputGuide}
 PRONOUNS: ${pronounGuide}`;
-  const prompt = `Generate a synastry reading comparing these two natal charts (${nameA} and ${nameB}). Analyze planetary interactions (aspects, house overlays). Include: relationship dynamics, communication, emotional connection, strengths, growth areas. Add dailyRelationshipAdvice: one paragraph of relationship advice for today based on current planetary aspects and transits—how to best support each other, what to be aware of, and how to navigate the day together. No specific dates/times—focus on practical guidance. Also add dailyComparison: compare/contrast their individual daily energies and how they interact. Reference specific planetary pairs.
+  const prompt = `Generate a synastry reading for ${nameA} and ${nameB}. ${nameOutputGuide} Analyze planetary interactions (aspects, house overlays). Include relationship dynamics, communication, emotional connection, strengths, growth areas. Add dailyRelationshipAdvice and dailyComparison — use transits when present. Reference planetary pairs and use names in the prose.
 
 Return JSON with: summary, strengths (array of 3), challenges (array of 2), communication, emotionalConnection, advice, dailyRelationshipAdvice, dailyComparison.`;
   const obj = (await callOpenAI(config.openaiKey, system, prompt)) as SynastryReading;
