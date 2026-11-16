@@ -2,7 +2,6 @@
   "name": "android",
   "version": "1.0.0",
   "license": "UNLICENSED",
-  "copyright": "ai-agent-devs",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

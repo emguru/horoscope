@@ -1,73 +1,54 @@
-# Natal Chart Horoscope App
+# Natal Chart Horoscope
 
-A Next.js app that generates personalized daily astrological readings based on your natal chart. Enter your birth date, time, and location to get a data-driven reading.
+A **Next.js 16 + React 19** app that turns birth date, time, and location into a natal chart and a structured daily reading. Includes an Expo Android client in `android/`.
+
+This is a personal/portfolio project: forms, API routes, client state, and a small mobile UI — not a production astrology product.
 
 ## Features
 
-- **Birth data inputs**: Date, time (local), and physical location
-- **Geocoding**: Converts city/location to coordinates via Nominatim (free, no key)
-- **Natal chart**: Uses [FreeAstroAPI](https://freeastroapi.com/) (Swiss Ephemeris) when API key is set; fallback when not
-- **AI readings**: Structured daily interpretation via OpenAI, following strict analytical guidelines
+- Birth data form (date, time, location)
+- Geocoding via Nominatim (no API key)
+- Natal chart via [FreeAstroAPI](https://freeastroapi.com/) when a key is set, with a local fallback
+- Daily reading and partner/synastry compare
+- Settings for pronouns and optional per-user API keys
+- Android app (React Native / Expo) that talks to the same APIs
 
 ## Setup
 
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
 
-2. **Environment variables**
-   ```bash
-   cp .env.local.example .env.local
-   ```
-   Edit `.env.local`:
-   - `FREE_ASTRO_API_KEY` – Get a free key at [freeastroapi.com](https://freeastroapi.com/) (80 req/day)
-   - `OPENAI_API_KEY` – Required for AI readings. Get at [platform.openai.com](https://platform.openai.com/api-keys)
+In `.env.local`:
 
-3. **Run**
-   ```bash
-   npm run dev
-   ```
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` | For AI readings | [OpenAI API keys](https://platform.openai.com/api-keys) |
+| `FREE_ASTRO_API_KEY` | Optional | Natal/transit detail ([freeastroapi.com](https://freeastroapi.com/), 80 req/day) |
 
-## Settings (Web & Android)
+Open [http://localhost:3000](http://localhost:3000).
 
-Both apps include a **Settings** button (⚙):
-
-- **Pronouns** – He/She/They or prefer not to say. Personalizes reading language.
-- **API Base URL** – Leave empty on web. On Android, set your backend URL.
-- **Use custom API keys** – Toggle to enter FreeAstro and OpenAI keys.
-
-## Features
-
-- **Daily Reading** – Personal horoscope based on your natal chart
-- **Compare with Partner** – Synastry / relationship compatibility between two birth charts
-
-## How it works
-
-1. User enters birth date, time, and location.
-2. Location is geocoded to lat/lng for accurate house placement.
-3. Natal chart is calculated (FreeAstroAPI or fallback).
-4. AI generates a daily reading using the natal chart data and strict guidelines:
-   - Every statement references specific placements
-   - No generic horoscope language
-   - Professional, data-driven tone
-
-## Android app
-
-An Android version lives in the `android/` subfolder. It uses the same backend APIs.
+## Android
 
 ```bash
 cd android
 npm install
-npm run android    # Run on emulator/device
+npm run android
 ```
 
-To build an APK, see [android/README.md](android/README.md). Use **EAS Build** for cloud builds (no Android Studio required).
+See [android/README.md](android/README.md) for emulator vs device URLs and EAS builds.
 
-## Tech stack
+## Layout
 
-- Next.js 16, React 19, TypeScript
-- Tailwind CSS
-- Vercel AI SDK + OpenAI
-- FreeAstroAPI (natal chart)
-- Nominatim (geocoding)
+```
+src/app/           Next.js App Router pages and API routes
+src/components/    React UI (forms, chart wheel, readings, settings)
+src/lib/           Chart math, geocoding, prompts
+android/           Expo / React Native client
+```
+
+## License
+
+Source is for portfolio review. Do not commit API keys.
